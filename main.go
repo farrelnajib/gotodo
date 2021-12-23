@@ -24,7 +24,7 @@ func main() {
 	router.HandleFunc("/todo-items/{id}", controllers.DeleteTodo).Methods("DELETE")
 	router.HandleFunc("/todo-items/{id}", controllers.EditTodo).Methods("PATCH")
 
-	err := http.ListenAndServe("localhost:3030", router)
+	err := http.ListenAndServe(":3030", router)
 	if err != nil {
 		fmt.Println(err.Error())
 	}

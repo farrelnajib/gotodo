@@ -3,6 +3,7 @@ package models
 import (
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"time"
 
 	"github.com/farrelnajib/gotodo/utils"
@@ -13,7 +14,7 @@ type Todo struct {
 	ID              uint64         `gorm:"primary_key" json:"id"`
 	ActivityGroupID uint64         `json:"activity_group_id"`
 	Title           string         `json:"title"`
-	IsActive        bool           `gorm:"default:1" json:"is_active"`
+	IsActive        *bool          `gorm:"default:1" json:"is_active"`
 	Priority        string         `gorm:"default:'very-high'" json:"priority"`
 	CreatedAt       time.Time      `json:"created_at"`
 	UpdatedAt       time.Time      `json:"updated_at"`
@@ -73,7 +74,7 @@ func GetTodos(activityId uint) []map[string]interface{} {
 	json.Unmarshal(temp, &data)
 
 	for idx, row := range data {
-		row["is_active"] = convertBool(todos[idx].IsActive)
+		row["is_active"] = convertBool(*todos[idx].IsActive)
 	}
 
 	return data
@@ -91,7 +92,8 @@ func GetTodoById(id uint) map[string]interface{} {
 	temp, _ := json.Marshal(&todo)
 	json.Unmarshal(temp, &data)
 
-	data["is_active"] = convertBool(todo.IsActive)
+	data["is_active"] = convertBool(*todo.IsActive)
+	data["activity_group_id"] = strconv.Itoa(int(todo.ActivityGroupID))
 
 	return data
 }
@@ -115,15 +117,11 @@ func DeleteTodo(id uint) bool {
 }
 
 func (todo *Todo) EditTodo(id uint) (utils.Response, int) {
-	if response, ok := todo.ValidateTodo(); !ok {
-		return response, 400
-	}
-
 	existing := &Todo{}
 
 	err := GetDB().Where("id = ?", id).First(&existing).Error
 	if err != nil {
-		response := utils.Message("Not Found", fmt.Sprintf("Activity with ID %d Not Found", id), map[string]string{})
+		response := utils.Message("Not Found", fmt.Sprintf("Todo with ID %d Not Found", id), map[string]string{})
 		return response, 404
 	}
 
@@ -133,6 +131,12 @@ func (todo *Todo) EditTodo(id uint) (utils.Response, int) {
 		return response, 500
 	}
 
-	response := utils.Response{Status: "Success", Message: "Success", Data: existing}
+	var data map[string]interface{}
+	temp, _ := json.Marshal(&existing)
+	json.Unmarshal(temp, &data)
+
+	data["is_active"] = convertBool(*existing.IsActive)
+
+	response := utils.Response{Status: "Success", Message: "Success", Data: data}
 	return response, 200
 }

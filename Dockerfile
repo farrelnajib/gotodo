@@ -6,10 +6,10 @@ COPY go.mod ./
 COPY go.sum ./
 RUN go mod download
 
-COPY *.go ./
+COPY . .
 
-RUN go build -o /gotodo
+RUN go build -o gotodo
 
 EXPOSE 3030
 
-CMD [ "/gotodo" ]
+CMD [ "./gotodo" ]
