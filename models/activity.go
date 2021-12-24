@@ -79,23 +79,23 @@ func DeleteActivity(id uint) bool {
 	return true
 }
 
-func (activity *Activity) EditActivity(id uint) (utils.Response, int) {
+func (activity *Activity) EditActivity(id uint) (utils.Response, int, *Activity) {
 	if response, ok := activity.ValidateActivity(); !ok {
-		return response, 400
+		return response, 400, nil
 	}
 
 	existing := GetActivityById(id)
 	if existing == nil {
 		response := utils.Message("Not Found", fmt.Sprintf("Activity with ID %d Not Found", id), map[string]string{})
-		return response, 404
+		return response, 404, nil
 	}
 
 	err := GetDB().Model(&existing).Updates(activity).Error
 	if err != nil {
 		response := utils.Message("Error", err.Error(), map[string]string{})
-		return response, 500
+		return response, 500, nil
 	}
 
 	response := utils.Response{Status: "Success", Message: "Success", Data: existing}
-	return response, 200
+	return response, 200, existing
 }

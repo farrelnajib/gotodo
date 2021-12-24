@@ -39,9 +39,9 @@ func convertBool(boolean bool) string {
 	return "0"
 }
 
-func (todo *Todo) CreateTodo() (utils.Response, int) {
+func (todo *Todo) CreateTodo() (utils.Response, int, map[string]interface{}) {
 	if response, ok := todo.ValidateTodo(); !ok {
-		return response, 400
+		return response, 400, nil
 	}
 
 	GetDB().Create(&todo)
@@ -50,10 +50,12 @@ func (todo *Todo) CreateTodo() (utils.Response, int) {
 	temp, _ := json.Marshal(&todo)
 	json.Unmarshal(temp, &data)
 
+	cachedData := data
+
 	delete(data, "deleted_at")
 
 	response := utils.Response{Status: "Success", Message: "Success", Data: data}
-	return response, 201
+	return response, 201, cachedData
 }
 
 func GetTodos(activityId uint) []map[string]interface{} {
@@ -98,37 +100,39 @@ func GetTodoById(id uint) map[string]interface{} {
 	return data
 }
 
-func DeleteTodo(id uint) bool {
+func DeleteTodo(id uint) (bool, uint64) {
 	todo := &Todo{}
 	err := GetDB().Where("id = ?", id).First(&todo).Error
 
 	if err != nil {
-		return false
+		return false, 0
 	}
+
+	activityId := todo.ActivityGroupID
 
 	err = GetDB().Delete(&todo).Error
 
 	if err != nil {
 		fmt.Println(err.Error())
-		return false
+		return false, 0
 	}
 
-	return true
+	return true, activityId
 }
 
-func (todo *Todo) EditTodo(id uint) (utils.Response, int) {
+func (todo *Todo) EditTodo(id uint) (utils.Response, int, *Todo) {
 	existing := &Todo{}
 
 	err := GetDB().Where("id = ?", id).First(&existing).Error
 	if err != nil {
 		response := utils.Message("Not Found", fmt.Sprintf("Todo with ID %d Not Found", id), map[string]string{})
-		return response, 404
+		return response, 404, nil
 	}
 
 	err = GetDB().Model(&existing).Updates(todo).Error
 	if err != nil {
 		response := utils.Message("Error", err.Error(), map[string]string{})
-		return response, 500
+		return response, 500, nil
 	}
 
 	var data map[string]interface{}
@@ -138,5 +142,5 @@ func (todo *Todo) EditTodo(id uint) (utils.Response, int) {
 	data["is_active"] = convertBool(*existing.IsActive)
 
 	response := utils.Response{Status: "Success", Message: "Success", Data: data}
-	return response, 200
+	return response, 200, existing
 }
