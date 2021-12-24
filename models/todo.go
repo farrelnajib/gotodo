@@ -3,7 +3,6 @@ package models
 import (
 	"encoding/json"
 	"fmt"
-	"strconv"
 	"time"
 
 	"github.com/farrelnajib/gotodo/utils"
@@ -32,16 +31,16 @@ func (todo *Todo) ValidateTodo() (utils.Response, bool) {
 	return utils.Message("Success", "Success", map[string]string{}), true
 }
 
-func convertBool(boolean bool) string {
-	if boolean {
-		return "1"
-	}
-	return "0"
-}
+// func convertBool(boolean bool) string {
+// 	if boolean {
+// 		return "1"
+// 	}
+// 	return "0"
+// }
 
-func (todo *Todo) CreateTodo() (utils.Response, int, map[string]interface{}) {
+func (todo *Todo) CreateTodo() (utils.Response, int) {
 	if response, ok := todo.ValidateTodo(); !ok {
-		return response, 400, nil
+		return response, 400
 	}
 
 	GetDB().Create(&todo)
@@ -50,15 +49,13 @@ func (todo *Todo) CreateTodo() (utils.Response, int, map[string]interface{}) {
 	temp, _ := json.Marshal(&todo)
 	json.Unmarshal(temp, &data)
 
-	cachedData := data
-
 	delete(data, "deleted_at")
 
 	response := utils.Response{Status: "Success", Message: "Success", Data: data}
-	return response, 201, cachedData
+	return response, 201
 }
 
-func GetTodos(activityId uint) []map[string]interface{} {
+func GetTodos(activityId uint) []*Todo {
 	todos := make([]*Todo, 0)
 
 	query := GetDB()
@@ -71,18 +68,10 @@ func GetTodos(activityId uint) []map[string]interface{} {
 		return nil
 	}
 
-	var data []map[string]interface{}
-	temp, _ := json.Marshal(&todos)
-	json.Unmarshal(temp, &data)
-
-	for idx, row := range data {
-		row["is_active"] = convertBool(*todos[idx].IsActive)
-	}
-
-	return data
+	return todos
 }
 
-func GetTodoById(id uint) map[string]interface{} {
+func GetTodoById(id uint) *Todo {
 	todo := &Todo{}
 	err := GetDB().Where("id = ?", id).First(&todo).Error
 
@@ -90,14 +79,7 @@ func GetTodoById(id uint) map[string]interface{} {
 		return nil
 	}
 
-	var data map[string]interface{}
-	temp, _ := json.Marshal(&todo)
-	json.Unmarshal(temp, &data)
-
-	data["is_active"] = convertBool(*todo.IsActive)
-	data["activity_group_id"] = strconv.Itoa(int(todo.ActivityGroupID))
-
-	return data
+	return todo
 }
 
 func DeleteTodo(id uint) (bool, uint64) {
@@ -135,12 +117,6 @@ func (todo *Todo) EditTodo(id uint) (utils.Response, int, *Todo) {
 		return response, 500, nil
 	}
 
-	var data map[string]interface{}
-	temp, _ := json.Marshal(&existing)
-	json.Unmarshal(temp, &data)
-
-	data["is_active"] = convertBool(*existing.IsActive)
-
-	response := utils.Response{Status: "Success", Message: "Success", Data: data}
+	response := utils.Response{Status: "Success", Message: "Success", Data: existing}
 	return response, 200, existing
 }

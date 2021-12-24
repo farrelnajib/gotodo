@@ -68,10 +68,10 @@ var CreateTodo = func(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	response, status, cachedData := todo.CreateTodo()
+	response, status := todo.CreateTodo()
 
 	if status == 201 {
-		cache.SetWithTTL(fmt.Sprintf("todo_%d", todo.ID), cachedData, time.Hour)
+		cache.SetWithTTL(fmt.Sprintf("todo_%d", todo.ID), todo, time.Hour)
 		cache.Remove("all_todos_0")
 		cache.Remove(fmt.Sprintf("all_todos_%d", int(todo.ActivityGroupID)))
 	}
