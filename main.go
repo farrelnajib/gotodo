@@ -1,34 +1,31 @@
 package main
 
 import (
-	"fmt"
-	"net/http"
+	"log"
 
 	"github.com/farrelnajib/gotodo/controllers"
-	"github.com/go-chi/chi/middleware"
-	"github.com/gorilla/mux"
+	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v2/middleware/cache"
+	"github.com/gofiber/fiber/v2/middleware/logger"
 )
 
 func main() {
-	router := mux.NewRouter()
+	router := fiber.New()
 
-	router.HandleFunc("/", controllers.GetActivities)
-	router.HandleFunc("/activity-groups", controllers.GetActivities).Methods("GET")
-	router.HandleFunc("/activity-groups", controllers.CreateActivity).Methods("POST")
-	router.HandleFunc("/activity-groups/{id}", controllers.GetActivitiesById).Methods("GET")
-	router.HandleFunc("/activity-groups/{id}", controllers.DeleteActivity).Methods("DELETE")
-	router.HandleFunc("/activity-groups/{id}", controllers.EditActivity).Methods("PATCH")
+	router.Use(logger.New())
+	router.Use(cache.New())
 
-	router.HandleFunc("/todo-items", controllers.GetAllTodo).Methods("GET")
-	router.HandleFunc("/todo-items", controllers.CreateTodo).Methods("POST")
-	router.HandleFunc("/todo-items/{id}", controllers.GetTodoById).Methods("GET")
-	router.HandleFunc("/todo-items/{id}", controllers.DeleteTodo).Methods("DELETE")
-	router.HandleFunc("/todo-items/{id}", controllers.EditTodo).Methods("PATCH")
+	router.Get("/activity-groups", controllers.GetActivities)
+	router.Get("/activity-groups/:id", controllers.GetActivitiesById)
+	router.Post("/activity-groups/", controllers.CreateActivity)
+	router.Delete("/activity-groups/:id", controllers.DeleteActivity)
+	router.Patch("/activity-groups/:id", controllers.EditActivity)
 
-	router.Use(middleware.Logger)
+	router.Get("/todo-items", controllers.GetAllTodo)
+	router.Get("/todo-items/:id", controllers.GetTodoById)
+	router.Post("/todo-items", controllers.CreateTodo)
+	router.Delete("/todo-items/:id", controllers.DeleteTodo)
+	router.Patch("/todo-items/:id", controllers.EditTodo)
 
-	err := http.ListenAndServe(":3030", router)
-	if err != nil {
-		fmt.Println(err.Error())
-	}
+	log.Fatal(router.Listen(":3030"))
 }

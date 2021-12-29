@@ -48,7 +48,7 @@ func GetTodos(activityId uint) []*Todo {
 	if activityId > 0 {
 		query = query.Where("activity_group_id = ?", activityId)
 	}
-	err := query.Find(&todos).Error
+	err := query.Where("is_active", 1).Find(&todos).Error
 	if err != nil {
 		fmt.Println(err.Error())
 		return nil

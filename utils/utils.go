@@ -1,8 +1,7 @@
 package utils
 
 import (
-	"encoding/json"
-	"net/http"
+	"github.com/gofiber/fiber/v2"
 )
 
 type Response struct {
@@ -15,10 +14,7 @@ var Message = func(status string, message string, data interface{}) Response {
 	return Response{Status: status, Message: message, Data: data}
 }
 
-var Respond = func(w http.ResponseWriter, code int, response Response) {
-	w.Header().Add("Content-Type", "application/json")
-	w.WriteHeader(code)
-
+var Respond = func(c *fiber.Ctx, code int, response Response) error {
 	resp := response
-	json.NewEncoder(w).Encode(resp)
+	return c.Status(code).JSON(resp)
 }

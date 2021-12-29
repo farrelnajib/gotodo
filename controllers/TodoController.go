@@ -1,21 +1,19 @@
 package controllers
 
 import (
-	"encoding/json"
 	"fmt"
-	"net/http"
 	"strconv"
 
 	"github.com/farrelnajib/gotodo/models"
 	"github.com/farrelnajib/gotodo/utils"
-	"github.com/gorilla/mux"
+	"github.com/gofiber/fiber/v2"
 )
 
 var todoCache = map[string][]*models.Todo{}
 var singleTodoCache = map[string]*models.Todo{}
 
-var GetAllTodo = func(w http.ResponseWriter, r *http.Request) {
-	params := r.FormValue("activity_group_id")
+var GetAllTodo = func(c *fiber.Ctx) error {
+	params := c.Query("activity_group_id")
 
 	activityId, err := strconv.Atoi(params)
 	if err != nil {
@@ -24,22 +22,21 @@ var GetAllTodo = func(w http.ResponseWriter, r *http.Request) {
 
 	key := fmt.Sprintf("all_todos_%d", activityId)
 
-	data, isFound := todoCache[key]
-	if !isFound {
+	data, _ := todoCache[key]
+	if data == nil || len(data) == 0 {
 		data = models.GetTodos(uint(activityId))
 		todoCache[key] = data
 	}
 
-	response := utils.Response{Status: "Success", Message: "Success", Data: data}
-	utils.Respond(w, 200, response)
+	response := utils.Message("Success", "Success", data)
+	return utils.Respond(c, 200, response)
 }
 
-var GetTodoById = func(w http.ResponseWriter, r *http.Request) {
-	params := mux.Vars(r)
-	id, err := strconv.Atoi(params["id"])
+var GetTodoById = func(c *fiber.Ctx) error {
+	params := c.Params("id")
+	id, err := strconv.Atoi(params)
 	if err != nil {
-		utils.Respond(w, 404, utils.Response{Status: "Not Found", Message: fmt.Sprintf("Todo with ID %s Not Found", params["id"]), Data: map[string]string{}})
-		return
+		return utils.Respond(c, 404, utils.Response{Status: "Not Found", Message: fmt.Sprintf("Todo with ID %s Not Found", params), Data: map[string]string{}})
 	}
 
 	key := fmt.Sprintf("todo_%d", id)
@@ -47,27 +44,24 @@ var GetTodoById = func(w http.ResponseWriter, r *http.Request) {
 	data, isFound := singleTodoCache[key]
 	if isFound && data != nil {
 		response := utils.Response{Status: "Success", Message: "Success", Data: data}
-		utils.Respond(w, 200, response)
-		return
+		return utils.Respond(c, 200, response)
 	}
 
 	query := models.GetTodoById(uint(id))
 	if query == nil {
-		utils.Respond(w, 404, utils.Response{Status: "Not Found", Message: fmt.Sprintf("Todo with ID %d Not Found", id), Data: map[string]string{}})
-		return
+		return utils.Respond(c, 404, utils.Response{Status: "Not Found", Message: fmt.Sprintf("Todo with ID %d Not Found", id), Data: map[string]string{}})
 	}
 
 	singleTodoCache[key] = query
 	response := utils.Response{Status: "Success", Message: "Success", Data: query}
-	utils.Respond(w, 200, response)
+	return utils.Respond(c, 200, response)
 }
 
-var CreateTodo = func(w http.ResponseWriter, r *http.Request) {
+var CreateTodo = func(c *fiber.Ctx) error {
 	todo := &models.Todo{}
 
-	if err := json.NewDecoder(r.Body).Decode(todo); err != nil {
-		utils.Respond(w, 400, utils.Response{Status: "Bad request", Message: ""})
-		return
+	if err := c.BodyParser(todo); err != nil {
+		return utils.Respond(c, 400, utils.Response{Status: "Bad Request", Message: ""})
 	}
 
 	response, status := todo.CreateTodo()
@@ -76,85 +70,66 @@ var CreateTodo = func(w http.ResponseWriter, r *http.Request) {
 		key := fmt.Sprintf("todo_%d", todo.ID)
 		singleTodoCache[key] = todo
 
-		if _, isFound := todoCache["all_todos_0"]; isFound {
-			todoCache["all_todos_0"] = append(todoCache["all_todos_0"], todo)
-		} else {
+		if cache, _ := todoCache["all_todos_0"]; cache == nil || len(cache) == 0 {
 			todoCache["all_todos_0"] = []*models.Todo{todo}
+		} else {
+			todoCache["all_todos_0"] = append(todoCache["all_todos_0"], todo)
 		}
 
 		key = fmt.Sprintf("all_todos_%d", int(todo.ActivityGroupID))
-		if _, isFound := todoCache[key]; isFound {
-			todoCache[key] = append(todoCache[key], todo)
-		} else {
+		if cache, _ := todoCache[key]; cache == nil || len(cache) == 0 {
 			todoCache[key] = []*models.Todo{todo}
+		} else {
+			todoCache[key] = append(todoCache[key], todo)
 		}
 	}
 
-	utils.Respond(w, status, response)
+	return utils.Respond(c, status, response)
 }
 
-var DeleteTodo = func(w http.ResponseWriter, r *http.Request) {
-	params := mux.Vars(r)
-	id, err := strconv.Atoi(params["id"])
+var DeleteTodo = func(c *fiber.Ctx) error {
+	params := c.Params("id")
+	id, err := strconv.Atoi(params)
 	if err != nil {
-		utils.Respond(w, 404, utils.Response{Status: "Not Found", Message: fmt.Sprintf("Todo with ID %s Not Found", params["id"]), Data: map[string]string{}})
-		return
+		return utils.Respond(c, 404, utils.Response{Status: "Not Found", Message: fmt.Sprintf("Todo with ID %s Not Found", params), Data: map[string]string{}})
 	}
 
 	deleted, activityId := models.DeleteTodo(uint(id))
 	if !deleted {
-		utils.Respond(w, 404, utils.Response{Status: "Not Found", Message: fmt.Sprintf("Todo with ID %d Not Found", id), Data: map[string]string{}})
-		return
+		return utils.Respond(c, 404, utils.Response{Status: "Not Found", Message: fmt.Sprintf("Todo with ID %d Not Found", id), Data: map[string]string{}})
 	}
 
-	if _, isFound := todoCache["all_todos_0"]; isFound {
-		todoCache["all_todos_0"] = nil
-	}
+	todoCache["all_todos_0"] = []*models.Todo{}
 
 	key := fmt.Sprintf("all_todos_%d", activityId)
-	if _, isFound := todoCache[key]; isFound {
-		todoCache[key] = nil
-	}
+	todoCache[key] = []*models.Todo{}
 
 	key = fmt.Sprintf("todo_%d", id)
-	if _, isFound := singleTodoCache[key]; isFound {
-		singleTodoCache[key] = nil
-	}
+	singleTodoCache[key] = nil
 
-	utils.Respond(w, 200, utils.Response{Status: "Success", Message: "Success", Data: map[string]string{}})
+	return utils.Respond(c, 200, utils.Response{Status: "Success", Message: "Success", Data: map[string]string{}})
 }
 
-var EditTodo = func(w http.ResponseWriter, r *http.Request) {
-	params := mux.Vars(r)
-	id, err := strconv.Atoi(params["id"])
+var EditTodo = func(c *fiber.Ctx) error {
+	params := c.Params("id")
+	id, err := strconv.Atoi(params)
 	if err != nil {
-		utils.Respond(w, 404, utils.Response{Status: "Not Found", Message: fmt.Sprintf("Todo with ID %s Not Found", params["id"]), Data: map[string]string{}})
-		return
+		return utils.Respond(c, 404, utils.Response{Status: "Not Found", Message: fmt.Sprintf("Todo with ID %s Not Found", params), Data: map[string]string{}})
 	}
 
 	todo := &models.Todo{}
-	if err := json.NewDecoder(r.Body).Decode(todo); err != nil {
-		utils.Respond(w, 400, utils.Response{Status: "Bad request", Message: err.Error()})
-		return
+	if err := c.BodyParser(todo); err != nil {
+		return utils.Respond(c, 400, utils.Response{Status: "Bad Request", Message: err.Error()})
 	}
 
 	response, status, exsiting := todo.EditTodo(uint(id))
 
 	if status == 200 {
-		if _, isFound := todoCache["all_todos_0"]; isFound {
-			todoCache["all_todos_0"] = nil
-		}
+		todoCache = map[string][]*models.Todo{}
 
-		key := fmt.Sprintf("all_todos_%d", exsiting.ActivityGroupID)
-		if _, isFound := todoCache[key]; isFound {
-			todoCache[key] = nil
-		}
-
-		key = fmt.Sprintf("todo_%d", id)
-		if _, isFound := singleTodoCache[key]; isFound {
-			singleTodoCache[key] = exsiting
-		}
+		key := fmt.Sprintf("todo_%d", id)
+		singleTodoCache[key] = exsiting
 	}
 
-	utils.Respond(w, status, response)
+	return utils.Respond(c, status, response)
 }
