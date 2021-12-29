@@ -1,7 +1,6 @@
 package models
 
 import (
-	"encoding/json"
 	"fmt"
 	"time"
 
@@ -31,13 +30,6 @@ func (todo *Todo) ValidateTodo() (utils.Response, bool) {
 	return utils.Message("Success", "Success", map[string]string{}), true
 }
 
-// func convertBool(boolean bool) string {
-// 	if boolean {
-// 		return "1"
-// 	}
-// 	return "0"
-// }
-
 func (todo *Todo) CreateTodo() (utils.Response, int) {
 	if response, ok := todo.ValidateTodo(); !ok {
 		return response, 400
@@ -45,13 +37,7 @@ func (todo *Todo) CreateTodo() (utils.Response, int) {
 
 	GetDB().Create(&todo)
 
-	var data map[string]interface{}
-	temp, _ := json.Marshal(&todo)
-	json.Unmarshal(temp, &data)
-
-	delete(data, "deleted_at")
-
-	response := utils.Response{Status: "Success", Message: "Success", Data: data}
+	response := utils.Response{Status: "Success", Message: "Success", Data: todo}
 	return response, 201
 }
 

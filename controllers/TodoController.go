@@ -5,12 +5,14 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
-	"time"
 
 	"github.com/farrelnajib/gotodo/models"
 	"github.com/farrelnajib/gotodo/utils"
 	"github.com/gorilla/mux"
 )
+
+var todoCache = map[string][]*models.Todo{}
+var singleTodoCache = map[string]*models.Todo{}
 
 var GetAllTodo = func(w http.ResponseWriter, r *http.Request) {
 	params := r.FormValue("activity_group_id")
@@ -22,10 +24,10 @@ var GetAllTodo = func(w http.ResponseWriter, r *http.Request) {
 
 	key := fmt.Sprintf("all_todos_%d", activityId)
 
-	data, err1 := cache.Get(key)
-	if err1 == notFound {
+	data, isFound := todoCache[key]
+	if !isFound {
 		data = models.GetTodos(uint(activityId))
-		cache.SetWithTTL(key, data, time.Hour)
+		todoCache[key] = data
 	}
 
 	response := utils.Response{Status: "Success", Message: "Success", Data: data}
@@ -42,8 +44,8 @@ var GetTodoById = func(w http.ResponseWriter, r *http.Request) {
 
 	key := fmt.Sprintf("todo_%d", id)
 
-	data, err := cache.Get(key)
-	if err != notFound {
+	data, isFound := singleTodoCache[key]
+	if isFound && data != nil {
 		response := utils.Response{Status: "Success", Message: "Success", Data: data}
 		utils.Respond(w, 200, response)
 		return
@@ -55,8 +57,8 @@ var GetTodoById = func(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	cache.SetWithTTL(key, query, time.Hour)
-	response := utils.Response{Status: "Success", Message: "Success", Data: data}
+	singleTodoCache[key] = query
+	response := utils.Response{Status: "Success", Message: "Success", Data: query}
 	utils.Respond(w, 200, response)
 }
 
@@ -71,9 +73,21 @@ var CreateTodo = func(w http.ResponseWriter, r *http.Request) {
 	response, status := todo.CreateTodo()
 
 	if status == 201 {
-		cache.SetWithTTL(fmt.Sprintf("todo_%d", todo.ID), todo, time.Hour)
-		cache.Remove("all_todos_0")
-		cache.Remove(fmt.Sprintf("all_todos_%d", int(todo.ActivityGroupID)))
+		key := fmt.Sprintf("todo_%d", todo.ID)
+		singleTodoCache[key] = todo
+
+		if _, isFound := todoCache["all_todos_0"]; isFound {
+			todoCache["all_todos_0"] = append(todoCache["all_todos_0"], todo)
+		} else {
+			todoCache["all_todos_0"] = []*models.Todo{todo}
+		}
+
+		key = fmt.Sprintf("all_todos_%d", int(todo.ActivityGroupID))
+		if _, isFound := todoCache[key]; isFound {
+			todoCache[key] = append(todoCache[key], todo)
+		} else {
+			todoCache[key] = []*models.Todo{todo}
+		}
 	}
 
 	utils.Respond(w, status, response)
@@ -93,9 +107,19 @@ var DeleteTodo = func(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	cache.Remove("all_todos_0")
-	cache.Remove(fmt.Sprintf("all_todos_%d", activityId))
-	cache.Remove(fmt.Sprintf("todo_%d", id))
+	if _, isFound := todoCache["all_todos_0"]; isFound {
+		todoCache["all_todos_0"] = nil
+	}
+
+	key := fmt.Sprintf("all_todos_%d", activityId)
+	if _, isFound := todoCache[key]; isFound {
+		todoCache[key] = nil
+	}
+
+	key = fmt.Sprintf("todo_%d", id)
+	if _, isFound := singleTodoCache[key]; isFound {
+		singleTodoCache[key] = nil
+	}
 
 	utils.Respond(w, 200, utils.Response{Status: "Success", Message: "Success", Data: map[string]string{}})
 }
@@ -117,9 +141,19 @@ var EditTodo = func(w http.ResponseWriter, r *http.Request) {
 	response, status, exsiting := todo.EditTodo(uint(id))
 
 	if status == 200 {
-		cache.SetWithTTL(fmt.Sprintf("todo_%d", id), response.Data, time.Hour)
-		cache.Remove("all_todos_0")
-		cache.Remove(fmt.Sprintf("all_todos_%d", int(exsiting.ActivityGroupID)))
+		if _, isFound := todoCache["all_todos_0"]; isFound {
+			todoCache["all_todos_0"] = nil
+		}
+
+		key := fmt.Sprintf("all_todos_%d", exsiting.ActivityGroupID)
+		if _, isFound := todoCache[key]; isFound {
+			todoCache[key] = nil
+		}
+
+		key = fmt.Sprintf("todo_%d", id)
+		if _, isFound := singleTodoCache[key]; isFound {
+			singleTodoCache[key] = exsiting
+		}
 	}
 
 	utils.Respond(w, status, response)

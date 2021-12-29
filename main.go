@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/farrelnajib/gotodo/controllers"
+	"github.com/go-chi/chi/middleware"
 	"github.com/gorilla/mux"
 )
 
@@ -23,6 +24,8 @@ func main() {
 	router.HandleFunc("/todo-items/{id}", controllers.GetTodoById).Methods("GET")
 	router.HandleFunc("/todo-items/{id}", controllers.DeleteTodo).Methods("DELETE")
 	router.HandleFunc("/todo-items/{id}", controllers.EditTodo).Methods("PATCH")
+
+	router.Use(middleware.Logger)
 
 	err := http.ListenAndServe(":3030", router)
 	if err != nil {

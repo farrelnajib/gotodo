@@ -5,23 +5,24 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
-	"time"
 
-	"github.com/ReneKroon/ttlcache/v2"
 	"github.com/gorilla/mux"
 
 	"github.com/farrelnajib/gotodo/models"
 	"github.com/farrelnajib/gotodo/utils"
 )
 
-var cache ttlcache.SimpleCache = ttlcache.NewCache()
-var notFound = ttlcache.ErrNotFound
+// var cache ttlcache.SimpleCache = ttlcache.NewCache()
+// var notFound = ttlcache.ErrNotFound
+
+var activityCache = []*models.Activity{}
+var singleActivityCache = map[uint]*models.Activity{}
 
 var GetActivities = func(w http.ResponseWriter, r *http.Request) {
-	data, err := cache.Get("all_activities")
-	if err == notFound {
+	data := activityCache
+	if len(data) == 0 {
 		data = models.GetAllActivities()
-		cache.SetWithTTL("all_activities", data, time.Hour)
+		activityCache = data
 	}
 	response := utils.Response{Status: "Success", Message: "Success", Data: data}
 	utils.Respond(w, 200, response)
@@ -35,8 +36,8 @@ var GetActivitiesById = func(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	data, err := cache.Get(fmt.Sprintf("activity_%d", id))
-	if err != notFound {
+	data := singleActivityCache[uint(id)]
+	if data != nil {
 		response := utils.Response{Status: "Success", Message: "Success", Data: data}
 		utils.Respond(w, 200, response)
 		return
@@ -49,7 +50,7 @@ var GetActivitiesById = func(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	cache.SetWithTTL(fmt.Sprintf("activity_%d", id), query, time.Hour)
+	singleActivityCache[uint(id)] = query
 
 	response := utils.Response{Status: "Success", Message: "Success", Data: query}
 	utils.Respond(w, 200, response)
@@ -65,8 +66,8 @@ var CreateActivity = func(w http.ResponseWriter, r *http.Request) {
 
 	response, status := activity.CreateActivity()
 	if status == 201 {
-		cache.SetWithTTL(fmt.Sprintf("activity_%d", activity.ID), activity, time.Hour)
-		cache.Remove("all_activities")
+		singleActivityCache[uint(activity.ID)] = activity
+		activityCache = append(activityCache, activity)
 	}
 	utils.Respond(w, status, response)
 }
@@ -85,8 +86,8 @@ var DeleteActivity = func(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	cache.Remove("all_activities")
-	cache.Remove(fmt.Sprintf("activity_%d", id))
+	activityCache = []*models.Activity{}
+	singleActivityCache[uint(id)] = nil
 
 	utils.Respond(w, 200, utils.Response{Status: "Success", Message: "Success", Data: map[string]string{}})
 }
@@ -108,8 +109,8 @@ var EditActivity = func(w http.ResponseWriter, r *http.Request) {
 	response, status, data := activity.EditActivity(uint(id))
 
 	if status == 200 {
-		cache.SetWithTTL(fmt.Sprintf("activity_%d", data.ID), data, time.Hour)
-		cache.Remove("all_activities")
+		singleActivityCache[uint(id)] = data
+		activityCache = []*models.Activity{}
 	}
 
 	utils.Respond(w, status, response)

@@ -7,6 +7,7 @@ import (
 	"github.com/joho/godotenv"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
+	"gorm.io/gorm/logger"
 )
 
 var db *gorm.DB
@@ -26,7 +27,9 @@ func init() {
 	dbUri := fmt.Sprintf("%s:%s@(%s:%s)/%s?charset=utf8&parseTime=True&loc=Local", username, password, dbHost, dbPort, dbName)
 	fmt.Print(dbUri)
 
-	connection, err := gorm.Open(mysql.Open(dbUri), &gorm.Config{})
+	connection, err := gorm.Open(mysql.Open(dbUri), &gorm.Config{
+		Logger: logger.Default.LogMode(logger.Info),
+	})
 	if err != nil {
 		fmt.Print(err)
 	}
