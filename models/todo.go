@@ -30,15 +30,8 @@ func (todo *Todo) ValidateTodo() (utils.Response, bool) {
 	return utils.Message("Success", "Success", map[string]string{}), true
 }
 
-func (todo *Todo) CreateTodo() (utils.Response, int) {
-	if response, ok := todo.ValidateTodo(); !ok {
-		return response, 400
-	}
-
+func (todo *Todo) CreateTodo() {
 	GetDB().Create(&todo)
-
-	response := utils.Response{Status: "Success", Message: "Success", Data: todo}
-	return response, 201
 }
 
 func GetTodos(activityId uint) []*Todo {

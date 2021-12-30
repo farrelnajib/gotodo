@@ -2,17 +2,18 @@ package main
 
 import (
 	"log"
+	"runtime"
 
 	"github.com/farrelnajib/gotodo/controllers"
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cache"
-	"github.com/gofiber/fiber/v2/middleware/logger"
 )
 
 func main() {
+	runtime.GOMAXPROCS(2)
 	router := fiber.New()
 
-	router.Use(logger.New())
+	// router.Use(logger.New())
 	router.Use(cache.New())
 
 	router.Get("/activity-groups", controllers.GetActivities)

@@ -3,6 +3,7 @@ package controllers
 import (
 	"fmt"
 	"strconv"
+	"time"
 
 	"github.com/farrelnajib/gotodo/models"
 	"github.com/farrelnajib/gotodo/utils"
@@ -64,27 +65,40 @@ var CreateTodo = func(c *fiber.Ctx) error {
 		return utils.Respond(c, 400, utils.Response{Status: "Bad Request", Message: ""})
 	}
 
-	response, status := todo.CreateTodo()
-
-	if status == 201 {
-		key := fmt.Sprintf("todo_%d", todo.ID)
-		singleTodoCache[key] = todo
-
-		if cache, _ := todoCache["all_todos_0"]; cache == nil || len(cache) == 0 {
-			todoCache["all_todos_0"] = []*models.Todo{todo}
-		} else {
-			todoCache["all_todos_0"] = append(todoCache["all_todos_0"], todo)
-		}
-
-		key = fmt.Sprintf("all_todos_%d", int(todo.ActivityGroupID))
-		if cache, _ := todoCache[key]; cache == nil || len(cache) == 0 {
-			todoCache[key] = []*models.Todo{todo}
-		} else {
-			todoCache[key] = append(todoCache[key], todo)
-		}
+	response, isValid := todo.ValidateTodo()
+	if !isValid {
+		return utils.Respond(c, 400, response)
 	}
 
-	return utils.Respond(c, status, response)
+	now := time.Now()
+	valid := new(bool)
+	*valid = true
+
+	todo.ID = uint64(len(todoCache["all_todos_0"]) + 1)
+	todo.IsActive = valid
+	todo.Priority = "very-high"
+	todo.CreatedAt = now
+	todo.UpdatedAt = now
+
+	key := fmt.Sprintf("todo_%d", todo.ID)
+	singleTodoCache[key] = todo
+
+	if cache, _ := todoCache["all_todos_0"]; cache == nil || len(cache) == 0 {
+		todoCache["all_todos_0"] = []*models.Todo{todo}
+	} else {
+		todoCache["all_todos_0"] = append(todoCache["all_todos_0"], todo)
+	}
+
+	key = fmt.Sprintf("all_todos_%d", int(todo.ActivityGroupID))
+	if cache, _ := todoCache[key]; cache == nil || len(cache) == 0 {
+		todoCache[key] = []*models.Todo{todo}
+	} else {
+		todoCache[key] = append(todoCache[key], todo)
+	}
+
+	go todo.CreateTodo()
+
+	return utils.Respond(c, 201, utils.Message("Success", "Success", todo))
 }
 
 var DeleteTodo = func(c *fiber.Ctx) error {
