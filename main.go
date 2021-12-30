@@ -10,7 +10,7 @@ import (
 )
 
 func main() {
-	runtime.GOMAXPROCS(2)
+	runtime.GOMAXPROCS(4)
 	router := fiber.New()
 
 	// router.Use(logger.New())

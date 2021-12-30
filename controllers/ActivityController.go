@@ -3,6 +3,7 @@ package controllers
 import (
 	"fmt"
 	"strconv"
+	"time"
 
 	"github.com/gofiber/fiber/v2"
 
@@ -12,6 +13,12 @@ import (
 
 var activityCache = []*models.Activity{}
 var singleActivityCache = map[uint]*models.Activity{}
+var latestActivityId = 0
+
+func reQuery() {
+	data := models.GetAllActivities()
+	activityCache = data
+}
 
 var GetActivities = func(c *fiber.Ctx) error {
 	data := activityCache
@@ -55,12 +62,23 @@ var CreateActivity = func(c *fiber.Ctx) error {
 		return utils.Respond(c, 400, utils.Response{Status: "Bad Request", Message: ""})
 	}
 
-	response, status := activity.CreateActivity()
-	if status == 201 {
-		singleActivityCache[uint(activity.ID)] = activity
-		activityCache = append(activityCache, activity)
+	if response, valid := activity.ValidateActivity(); !valid {
+		return utils.Respond(c, 400, response)
 	}
-	return utils.Respond(c, status, response)
+
+	now := time.Now()
+
+	activity.ID = uint64(latestActivityId + 1)
+	activity.CreatedAt = now
+	activity.UpdatedAt = now
+
+	singleActivityCache[uint(activity.ID)] = activity
+	activityCache = append(activityCache, activity)
+
+	go activity.CreateActivity()
+
+	latestActivityId++
+	return utils.Respond(c, 201, utils.Message("Success", "Success", activity))
 }
 
 var DeleteActivity = func(c *fiber.Ctx) error {
@@ -75,7 +93,7 @@ var DeleteActivity = func(c *fiber.Ctx) error {
 		return utils.Respond(c, 404, utils.Response{Status: "Not Found", Message: fmt.Sprintf("Activity with ID %d Not Found", id), Data: map[string]string{}})
 	}
 
-	activityCache = []*models.Activity{}
+	go reQuery()
 	singleActivityCache[uint(id)] = nil
 
 	return utils.Respond(c, 200, utils.Response{Status: "Success", Message: "Success", Data: map[string]string{}})
@@ -97,7 +115,7 @@ var EditActivity = func(c *fiber.Ctx) error {
 
 	if status == 200 {
 		singleActivityCache[uint(id)] = data
-		activityCache = []*models.Activity{}
+		go reQuery()
 	}
 
 	return utils.Respond(c, status, response)

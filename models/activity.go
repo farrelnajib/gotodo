@@ -1,7 +1,6 @@
 package models
 
 import (
-	"encoding/json"
 	"fmt"
 	"time"
 
@@ -26,21 +25,8 @@ func (activity *Activity) ValidateActivity() (utils.Response, bool) {
 	return utils.Message("Success", "Success", map[string]string{}), true
 }
 
-func (activity *Activity) CreateActivity() (utils.Response, int) {
-	if response, ok := activity.ValidateActivity(); !ok {
-		return response, 400
-	}
-
+func (activity *Activity) CreateActivity() {
 	GetDB().Create(activity)
-
-	var data map[string]interface{}
-	temp, _ := json.Marshal(&activity)
-	json.Unmarshal(temp, &data)
-
-	delete(data, "deleted_at")
-
-	response := utils.Response{Status: "Success", Message: "Success", Data: data}
-	return response, 201
 }
 
 func GetAllActivities() []*Activity {

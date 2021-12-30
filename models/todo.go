@@ -52,7 +52,7 @@ func GetTodos(activityId uint) []*Todo {
 
 func GetTodoById(id uint) *Todo {
 	todo := &Todo{}
-	err := GetDB().Where("id = ?", id).First(&todo).Error
+	err := GetDB().First(&todo, id).Error
 
 	if err != nil {
 		return nil
@@ -63,7 +63,7 @@ func GetTodoById(id uint) *Todo {
 
 func DeleteTodo(id uint) (bool, uint64) {
 	todo := &Todo{}
-	err := GetDB().Where("id = ?", id).First(&todo).Error
+	err := GetDB().First(&todo, id).Error
 
 	if err != nil {
 		return false, 0
@@ -84,7 +84,7 @@ func DeleteTodo(id uint) (bool, uint64) {
 func (todo *Todo) EditTodo(id uint) (utils.Response, int, *Todo) {
 	existing := &Todo{}
 
-	err := GetDB().Where("id = ?", id).First(&existing).Error
+	err := GetDB().First(&existing, id).Error
 	if err != nil {
 		response := utils.Message("Not Found", fmt.Sprintf("Todo with ID %d Not Found", id), map[string]string{})
 		return response, 404, nil

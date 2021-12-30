@@ -12,6 +12,24 @@ import (
 
 var todoCache = map[string][]*models.Todo{}
 var singleTodoCache = map[string]*models.Todo{}
+var latestId = 0
+
+func reQueryTodo(activityId uint) {
+	var allDataChannel = make(chan []*models.Todo)
+	var filteredDataChannel = make(chan []*models.Todo)
+
+	go func() {
+		allDataChannel <- models.GetTodos(0)
+	}()
+	go func() {
+		filteredDataChannel <- models.GetTodos(activityId)
+	}()
+
+	key := fmt.Sprintf("all_todos_%d", activityId)
+
+	todoCache["all_todos_0"] = <-allDataChannel
+	todoCache[key] = <-filteredDataChannel
+}
 
 var GetAllTodo = func(c *fiber.Ctx) error {
 	params := c.Query("activity_group_id")
@@ -74,7 +92,7 @@ var CreateTodo = func(c *fiber.Ctx) error {
 	valid := new(bool)
 	*valid = true
 
-	todo.ID = uint64(len(todoCache["all_todos_0"]) + 1)
+	todo.ID = uint64(latestId + 1)
 	todo.IsActive = valid
 	todo.Priority = "very-high"
 	todo.CreatedAt = now
@@ -97,6 +115,7 @@ var CreateTodo = func(c *fiber.Ctx) error {
 	}
 
 	go todo.CreateTodo()
+	latestId++
 
 	return utils.Respond(c, 201, utils.Message("Success", "Success", todo))
 }
@@ -113,12 +132,9 @@ var DeleteTodo = func(c *fiber.Ctx) error {
 		return utils.Respond(c, 404, utils.Response{Status: "Not Found", Message: fmt.Sprintf("Todo with ID %d Not Found", id), Data: map[string]string{}})
 	}
 
-	todoCache["all_todos_0"] = []*models.Todo{}
+	go reQueryTodo(uint(activityId))
 
-	key := fmt.Sprintf("all_todos_%d", activityId)
-	todoCache[key] = []*models.Todo{}
-
-	key = fmt.Sprintf("todo_%d", id)
+	key := fmt.Sprintf("todo_%d", id)
 	singleTodoCache[key] = nil
 
 	return utils.Respond(c, 200, utils.Response{Status: "Success", Message: "Success", Data: map[string]string{}})
@@ -139,7 +155,7 @@ var EditTodo = func(c *fiber.Ctx) error {
 	response, status, exsiting := todo.EditTodo(uint(id))
 
 	if status == 200 {
-		todoCache = map[string][]*models.Todo{}
+		go reQueryTodo(uint(exsiting.ActivityGroupID))
 
 		key := fmt.Sprintf("todo_%d", id)
 		singleTodoCache[key] = exsiting
