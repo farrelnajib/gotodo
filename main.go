@@ -1,7 +1,6 @@
 package main
 
 import (
-	"log"
 	"runtime"
 
 	"github.com/farrelnajib/gotodo/controllers"
@@ -11,7 +10,9 @@ import (
 
 func main() {
 	runtime.GOMAXPROCS(4)
-	router := fiber.New()
+	router := fiber.New(fiber.Config{
+		DisableStartupMessage: true,
+	})
 
 	// router.Use(logger.New())
 	router.Use(cache.New())
@@ -28,5 +29,5 @@ func main() {
 	router.Delete("/todo-items/:id", controllers.DeleteTodo)
 	router.Patch("/todo-items/:id", controllers.EditTodo)
 
-	log.Fatal(router.Listen(":3030"))
+	router.Listen(":3030")
 }
