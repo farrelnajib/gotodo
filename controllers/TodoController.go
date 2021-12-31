@@ -14,21 +14,54 @@ var todoCache = map[string][]*models.Todo{}
 var singleTodoCache = map[string]*models.Todo{}
 var latestId = 0
 
-func reQueryTodo(activityId uint) {
-	var allDataChannel = make(chan []*models.Todo)
-	var filteredDataChannel = make(chan []*models.Todo)
+func RemoveTodo(slice []*models.Todo, s int) []*models.Todo {
+	return append(slice[:s], slice[s+1:]...)
+}
 
-	go func() {
-		allDataChannel <- models.GetTodos(0)
-	}()
-	go func() {
-		filteredDataChannel <- models.GetTodos(activityId)
-	}()
-
+func DeleteSingleTodoFromCache(id int, activityId int) {
 	key := fmt.Sprintf("all_todos_%d", activityId)
 
-	todoCache["all_todos_0"] = <-allDataChannel
-	todoCache[key] = <-filteredDataChannel
+	go func() {
+		idxAll := SliceIndex(len(todoCache["all_todos_0"]), func(i int) bool { return todoCache["all_todos_0"][i].ID == uint64(id) })
+		if idxAll > -1 {
+			todoCache["all_todos_0"] = RemoveTodo(todoCache["all_todos_0"], idxAll)
+		}
+	}()
+
+	go func() {
+		idxFiltered := SliceIndex(len(todoCache[key]), func(i int) bool { return todoCache[key][i].ID == uint64(id) })
+		if idxFiltered > -1 {
+			todoCache[key] = RemoveTodo(todoCache[key], idxFiltered)
+		}
+	}()
+}
+
+func EditSingleTodoInCache(todo *models.Todo) {
+	key := fmt.Sprintf("all_todos_%d", todo.ActivityGroupID)
+	var isActive = new(bool)
+	*isActive = true
+
+	go func() {
+		idxAll := SliceIndex(len(todoCache["all_todos_0"]), func(i int) bool { return todoCache["all_todos_0"][i].ID == todo.ID })
+		if idxAll > -1 {
+			if todo.IsActive == isActive {
+				todoCache["all_todos_0"][idxAll] = todo
+			} else {
+				todoCache["all_todos_0"] = RemoveTodo(todoCache["all_todos_0"], idxAll)
+			}
+		}
+	}()
+
+	go func() {
+		idxFiltered := SliceIndex(len(todoCache[key]), func(i int) bool { return todoCache[key][i].ID == todo.ID })
+		if idxFiltered > -1 {
+			if todo.IsActive == isActive {
+				todoCache[key][idxFiltered] = todo
+			} else {
+				todoCache[key] = RemoveTodo(todoCache[key], idxFiltered)
+			}
+		}
+	}()
 }
 
 var GetAllTodo = func(c *fiber.Ctx) error {
@@ -41,11 +74,11 @@ var GetAllTodo = func(c *fiber.Ctx) error {
 
 	key := fmt.Sprintf("all_todos_%d", activityId)
 
-	data, _ := todoCache[key]
-	if data == nil || len(data) == 0 {
-		data = models.GetTodos(uint(activityId))
-		todoCache[key] = data
-	}
+	data := todoCache[key]
+	// if data == nil || len(data) == 0 {
+	// 	data = models.GetTodos(uint(activityId))
+	// 	todoCache[key] = data
+	// }
 
 	response := utils.Message("Success", "Success", data)
 	return utils.Respond(c, 200, response)
@@ -60,19 +93,19 @@ var GetTodoById = func(c *fiber.Ctx) error {
 
 	key := fmt.Sprintf("todo_%d", id)
 
-	data, isFound := singleTodoCache[key]
-	if isFound && data != nil {
-		response := utils.Response{Status: "Success", Message: "Success", Data: data}
-		return utils.Respond(c, 200, response)
+	data := singleTodoCache[key]
+	if data == nil {
+		response := utils.Response{Status: "Not Found", Message: fmt.Sprintf("Todo with ID %d Not Found", id), Data: map[string]string{}}
+		return utils.Respond(c, 404, response)
 	}
 
-	query := models.GetTodoById(uint(id))
-	if query == nil {
-		return utils.Respond(c, 404, utils.Response{Status: "Not Found", Message: fmt.Sprintf("Todo with ID %d Not Found", id), Data: map[string]string{}})
-	}
+	// query := models.GetTodoById(uint(id))
+	// if query == nil {
+	// 	return utils.Respond(c, 404, utils.Response{Status: "Not Found", Message: fmt.Sprintf("Todo with ID %d Not Found", id), Data: map[string]string{}})
+	// }
 
-	singleTodoCache[key] = query
-	response := utils.Response{Status: "Success", Message: "Success", Data: query}
+	// singleTodoCache[key] = query
+	response := utils.Response{Status: "Success", Message: "Success", Data: data}
 	return utils.Respond(c, 200, response)
 }
 
@@ -127,15 +160,22 @@ var DeleteTodo = func(c *fiber.Ctx) error {
 		return utils.Respond(c, 404, utils.Response{Status: "Not Found", Message: fmt.Sprintf("Todo with ID %s Not Found", params), Data: map[string]string{}})
 	}
 
-	deleted, activityId := models.DeleteTodo(uint(id))
-	if !deleted {
+	key := fmt.Sprintf("todo_%d", id)
+
+	todo := singleTodoCache[key]
+	// if todo == nil {
+	// 	todo = models.GetTodoById(uint(id))
+	// }
+
+	if todo == nil {
 		return utils.Respond(c, 404, utils.Response{Status: "Not Found", Message: fmt.Sprintf("Todo with ID %d Not Found", id), Data: map[string]string{}})
 	}
 
-	go reQueryTodo(uint(activityId))
-
-	key := fmt.Sprintf("todo_%d", id)
+	activityId := todo.ActivityGroupID
 	singleTodoCache[key] = nil
+
+	go todo.DeleteTodo()
+	go DeleteSingleTodoFromCache(id, int(activityId))
 
 	return utils.Respond(c, 200, utils.Response{Status: "Success", Message: "Success", Data: map[string]string{}})
 }
@@ -152,14 +192,30 @@ var EditTodo = func(c *fiber.Ctx) error {
 		return utils.Respond(c, 400, utils.Response{Status: "Bad Request", Message: err.Error()})
 	}
 
-	response, status, exsiting := todo.EditTodo(uint(id))
+	key := fmt.Sprintf("todo_%d", id)
+	existing := singleTodoCache[key]
+	// if existing == nil {
+	// 	existing = models.GetTodoById(uint(id))
+	// }
 
-	if status == 200 {
-		go reQueryTodo(uint(exsiting.ActivityGroupID))
-
-		key := fmt.Sprintf("todo_%d", id)
-		singleTodoCache[key] = exsiting
+	if existing == nil {
+		return utils.Respond(c, 404, utils.Response{Status: "Not Found", Message: fmt.Sprintf("Todo with ID %d Not Found", id), Data: map[string]string{}})
 	}
 
-	return utils.Respond(c, status, response)
+	if todo.Title != "" {
+		existing.Title = todo.Title
+	}
+	if todo.IsActive != existing.IsActive {
+		existing.IsActive = todo.IsActive
+	}
+	existing.UpdatedAt = time.Now()
+
+	go todo.EditTodo(existing)
+
+	go EditSingleTodoInCache(existing)
+
+	key = fmt.Sprintf("todo_%d", id)
+	singleTodoCache[key] = existing
+
+	return utils.Respond(c, 200, utils.Message("Success", "Success", existing))
 }

@@ -61,41 +61,10 @@ func GetTodoById(id uint) *Todo {
 	return todo
 }
 
-func DeleteTodo(id uint) (bool, uint64) {
-	todo := &Todo{}
-	err := GetDB().First(&todo, id).Error
-
-	if err != nil {
-		return false, 0
-	}
-
-	activityId := todo.ActivityGroupID
-
-	err = GetDB().Delete(&todo).Error
-
-	if err != nil {
-		fmt.Println(err.Error())
-		return false, 0
-	}
-
-	return true, activityId
+func (todo *Todo) DeleteTodo() {
+	GetDB().Delete(&todo)
 }
 
-func (todo *Todo) EditTodo(id uint) (utils.Response, int, *Todo) {
-	existing := &Todo{}
-
-	err := GetDB().First(&existing, id).Error
-	if err != nil {
-		response := utils.Message("Not Found", fmt.Sprintf("Todo with ID %d Not Found", id), map[string]string{})
-		return response, 404, nil
-	}
-
-	err = GetDB().Model(&existing).Updates(todo).Error
-	if err != nil {
-		response := utils.Message("Error", err.Error(), map[string]string{})
-		return response, 500, nil
-	}
-
-	response := utils.Response{Status: "Success", Message: "Success", Data: existing}
-	return response, 200, existing
+func (todo *Todo) EditTodo(existing *Todo) {
+	GetDB().Model(&existing).Updates(todo)
 }

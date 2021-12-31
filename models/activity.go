@@ -51,37 +51,10 @@ func GetActivityById(id uint) *Activity {
 	return activity
 }
 
-func DeleteActivity(id uint) bool {
-	activity := GetActivityById(id)
-	if activity == nil {
-		return false
-	}
-
-	err := GetDB().Delete(&activity).Error
-	if err != nil {
-		fmt.Println(err.Error())
-		return false
-	}
-	return true
+func (activity *Activity) DeleteActivity() {
+	GetDB().Delete(&activity)
 }
 
-func (activity *Activity) EditActivity(id uint) (utils.Response, int, *Activity) {
-	if response, ok := activity.ValidateActivity(); !ok {
-		return response, 400, nil
-	}
-
-	existing := GetActivityById(id)
-	if existing == nil {
-		response := utils.Message("Not Found", fmt.Sprintf("Activity with ID %d Not Found", id), map[string]string{})
-		return response, 404, nil
-	}
-
-	err := GetDB().Model(&existing).Updates(activity).Error
-	if err != nil {
-		response := utils.Message("Error", err.Error(), map[string]string{})
-		return response, 500, nil
-	}
-
-	response := utils.Response{Status: "Success", Message: "Success", Data: existing}
-	return response, 200, existing
+func (activity *Activity) EditActivity(existing *Activity) {
+	GetDB().Model(&existing).Updates(activity)
 }
