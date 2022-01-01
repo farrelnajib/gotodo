@@ -26,6 +26,8 @@ func init() {
 	fmt.Print(dbUri)
 
 	connection, err := gorm.Open(mysql.Open(dbUri), &gorm.Config{
+		SkipDefaultTransaction: true,
+		PrepareStmt:            true,
 		// Logger: logger.Default.LogMode(logger.Info),
 	})
 	if err != nil {

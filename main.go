@@ -9,7 +9,7 @@ import (
 )
 
 func main() {
-	runtime.GOMAXPROCS(4)
+	runtime.GOMAXPROCS(2)
 	router := fiber.New(fiber.Config{
 		DisableStartupMessage: true,
 	})

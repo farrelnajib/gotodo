@@ -96,7 +96,7 @@ var CreateActivity = func(c *fiber.Ctx) error {
 	singleActivityCache[uint(activity.ID)] = activity
 	activityCache = append(activityCache, activity)
 
-	go activity.CreateActivity()
+	activity.CreateActivity()
 
 	latestActivityId++
 	return utils.Respond(c, 201, utils.Message("Success", "Success", activity))

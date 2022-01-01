@@ -75,10 +75,10 @@ var GetAllTodo = func(c *fiber.Ctx) error {
 	key := fmt.Sprintf("all_todos_%d", activityId)
 
 	data := todoCache[key]
-	// if data == nil || len(data) == 0 {
-	// 	data = models.GetTodos(uint(activityId))
-	// 	todoCache[key] = data
-	// }
+	if len(data) == 0 {
+		data = models.GetTodos(uint(activityId))
+		todoCache[key] = data
+	}
 
 	response := utils.Message("Success", "Success", data)
 	return utils.Respond(c, 200, response)
@@ -134,18 +134,9 @@ var CreateTodo = func(c *fiber.Ctx) error {
 	key := fmt.Sprintf("todo_%d", todo.ID)
 	singleTodoCache[key] = todo
 
-	if cache, _ := todoCache["all_todos_0"]; cache == nil || len(cache) == 0 {
-		todoCache["all_todos_0"] = []*models.Todo{todo}
-	} else {
-		todoCache["all_todos_0"] = append(todoCache["all_todos_0"], todo)
-	}
-
 	key = fmt.Sprintf("all_todos_%d", int(todo.ActivityGroupID))
-	if cache, _ := todoCache[key]; cache == nil || len(cache) == 0 {
-		todoCache[key] = []*models.Todo{todo}
-	} else {
-		todoCache[key] = append(todoCache[key], todo)
-	}
+	todoCache["all_todos_0"] = nil
+	todoCache[key] = nil
 
 	go todo.CreateTodo()
 	latestId++

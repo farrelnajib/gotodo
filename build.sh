@@ -1,2 +1,2 @@
-docker build . --tag farrelnajib/gotodo:v6
-docker push farrelnajib/gotodo:v6
+docker build . --tag farrelnajib/gotodo:$1
+docker push farrelnajib/gotodo:$1
