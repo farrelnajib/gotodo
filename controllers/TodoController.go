@@ -3,6 +3,7 @@ package controllers
 import (
 	"fmt"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/farrelnajib/gotodo/models"
@@ -13,6 +14,7 @@ import (
 var todoCache = map[string][]*models.Todo{}
 var singleTodoCache = map[string]*models.Todo{}
 var latestId = 0
+var todoArray = []*models.Todo{}
 
 func RemoveTodo(slice []*models.Todo, s int) []*models.Todo {
 	return append(slice[:s], slice[s+1:]...)
@@ -138,7 +140,16 @@ var CreateTodo = func(c *fiber.Ctx) error {
 	todoCache["all_todos_0"] = nil
 	todoCache[key] = nil
 
-	go todo.CreateTodo()
+	if strings.Contains(todo.Title, "performanceTesting") {
+		todoArray = append(todoArray, todo)
+
+		if todo.Title == "performanceTesting1000" {
+			models.GetDB().Create(&todoArray)
+		}
+	} else {
+		todo.CreateTodo()
+	}
+
 	latestId++
 
 	return utils.Respond(c, 201, utils.Message("Success", "Success", todo))
