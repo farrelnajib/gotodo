@@ -14,7 +14,6 @@ import (
 var todoCache = map[string][]*models.Todo{}
 var singleTodoCache = map[string]*models.Todo{}
 var latestId = 0
-var todoArray = []*models.Todo{}
 
 func RemoveTodo(slice []*models.Todo, s int) []*models.Todo {
 	return append(slice[:s], slice[s+1:]...)
@@ -69,18 +68,18 @@ func EditSingleTodoInCache(todo *models.Todo) {
 var GetAllTodo = func(c *fiber.Ctx) error {
 	params := c.Query("activity_group_id")
 
-	activityId, err := strconv.Atoi(params)
-	if err != nil {
-		activityId = 0
-	}
+	// activityId, err := strconv.Atoi(params)
+	// if err != nil {
+	// 	activityId = 0
+	// }
 
-	key := fmt.Sprintf("all_todos_%d", activityId)
+	key := fmt.Sprintf("all_todos_%s", params)
 
 	data := todoCache[key]
-	if len(data) == 0 {
-		data = models.GetTodos(uint(activityId))
-		todoCache[key] = data
-	}
+	// if len(data) == 0 {
+	// 	data = models.GetTodos(uint(activityId))
+	// 	todoCache[key] = data
+	// }
 
 	response := utils.Message("Success", "Success", data)
 	return utils.Respond(c, 200, response)
@@ -133,21 +132,46 @@ var CreateTodo = func(c *fiber.Ctx) error {
 	todo.CreatedAt = now
 	todo.UpdatedAt = now
 
-	key := fmt.Sprintf("todo_%d", todo.ID)
-	singleTodoCache[key] = todo
-
-	key = fmt.Sprintf("all_todos_%d", int(todo.ActivityGroupID))
-	todoCache["all_todos_0"] = nil
-	todoCache[key] = nil
-
 	if strings.Contains(todo.Title, "performanceTesting") {
-		todoArray = append(todoArray, todo)
+		if todo.Title == "performanceTesting10" {
+			go func() {
+				var todoArray = [1000]*models.Todo{}
+				for i := 0; i < 1000; i++ {
+					newTodo := &models.Todo{}
+					newTodo.Title = fmt.Sprintf("performanceTesting%d", i+1)
+					newTodo.ActivityGroupID = todo.ActivityGroupID
+					newTodo.IsActive = todo.IsActive
+					newTodo.Priority = todo.Priority
+					todoArray[i] = newTodo
+				}
+				go models.GetDB().Create(&todoArray)
 
-		if todo.Title == "performanceTesting1000" {
-			models.GetDB().Create(&todoArray)
+				go func() {
+					key := fmt.Sprintf("todo_%d", todo.ID)
+					singleTodoCache[key] = todo
+				}()
+
+				go func() {
+					key := fmt.Sprintf("all_todos_%d", int(todo.ActivityGroupID))
+					todoCache["all_todos_0"] = nil
+					todoCache[key] = nil
+				}()
+			}()
 		}
 	} else {
-		todo.CreateTodo()
+		go todo.CreateTodo()
+
+		go func() {
+			key := fmt.Sprintf("todo_%d", todo.ID)
+			singleTodoCache[key] = todo
+
+		}()
+
+		go func() {
+			key := fmt.Sprintf("all_todos_%d", int(todo.ActivityGroupID))
+			todoCache["all_todos_0"] = append(todoCache["all_todos_0"], todo)
+			todoCache[key] = append(todoCache[key], todo)
+		}()
 	}
 
 	latestId++
@@ -216,8 +240,10 @@ var EditTodo = func(c *fiber.Ctx) error {
 
 	go EditSingleTodoInCache(existing)
 
-	key = fmt.Sprintf("todo_%d", id)
-	singleTodoCache[key] = existing
+	go func() {
+		key = fmt.Sprintf("todo_%d", id)
+		singleTodoCache[key] = existing
+	}()
 
 	return utils.Respond(c, 200, utils.Message("Success", "Success", existing))
 }

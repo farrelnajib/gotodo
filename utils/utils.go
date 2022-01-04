@@ -15,6 +15,6 @@ var Message = func(status string, message string, data interface{}) Response {
 }
 
 var Respond = func(c *fiber.Ctx, code int, response Response) error {
-	resp := response
-	return c.Status(code).JSON(resp)
+	c.Status(code)
+	return c.JSON(response)
 }

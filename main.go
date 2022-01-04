@@ -6,6 +6,7 @@ import (
 	"github.com/farrelnajib/gotodo/controllers"
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cache"
+	// "github.com/gofiber/fiber/v2/middleware/logger"
 )
 
 func main() {

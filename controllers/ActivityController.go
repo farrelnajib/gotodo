@@ -93,8 +93,10 @@ var CreateActivity = func(c *fiber.Ctx) error {
 	activity.CreatedAt = now
 	activity.UpdatedAt = now
 
-	singleActivityCache[uint(activity.ID)] = activity
-	activityCache = append(activityCache, activity)
+	go func() {
+		singleActivityCache[uint(activity.ID)] = activity
+		activityCache = append(activityCache, activity)
+	}()
 
 	activity.CreateActivity()
 
@@ -120,7 +122,9 @@ var DeleteActivity = func(c *fiber.Ctx) error {
 
 	go activity.DeleteActivity()
 	go DeleteSingleActivityFromCache(id)
-	singleActivityCache[uint(id)] = nil
+	go func() {
+		singleActivityCache[uint(id)] = nil
+	}()
 
 	return utils.Respond(c, 200, utils.Response{Status: "Success", Message: "Success", Data: map[string]string{}})
 }
@@ -152,10 +156,12 @@ var EditActivity = func(c *fiber.Ctx) error {
 
 	existing.Title = activity.Title
 	existing.UpdatedAt = time.Now()
-	singleActivityCache[uint(id)] = existing
 
 	go activity.EditActivity(existing)
 	go EditActivityInCache(existing)
+	go func() {
+		singleActivityCache[uint(id)] = existing
+	}()
 
 	return utils.Respond(c, 200, utils.Message("Success", "Success", existing))
 }
