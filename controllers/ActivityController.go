@@ -1,11 +1,12 @@
 package controllers
 
 import (
+	"encoding/json"
 	"fmt"
 	"strconv"
 	"time"
 
-	"github.com/gofiber/fiber/v2"
+	"github.com/valyala/fasthttp"
 
 	"github.com/farrelnajib/gotodo/models"
 	"github.com/farrelnajib/gotodo/utils"
@@ -38,26 +39,28 @@ func EditActivityInCache(activity *models.Activity) {
 	activityCache[idx] = activity
 }
 
-var GetActivities = func(c *fiber.Ctx) error {
+var GetActivities = func(c *fasthttp.RequestCtx) {
 	data := activityCache
 	// if len(data) == 0 {
 	// 	data = models.GetAllActivities()
 	// 	activityCache = data
 	// }
 	response := utils.Response{Status: "Success", Message: "Success", Data: data}
-	return utils.Respond(c, 200, response)
+	utils.Respond(c, 200, response)
 }
 
-var GetActivitiesById = func(c *fiber.Ctx) error {
-	params := c.Params("id")
+var GetActivitiesById = func(c *fasthttp.RequestCtx) {
+	params := fmt.Sprintf("%s", c.UserValue("id"))
 	id, err := strconv.Atoi(params)
 	if err != nil {
-		return utils.Respond(c, 404, utils.Response{Status: "Not Found", Message: fmt.Sprintf("Activity with ID %s Not Found", params), Data: map[string]string{}})
+		utils.Respond(c, 404, utils.Response{Status: "Not Found", Message: fmt.Sprintf("Activity with ID %s Not Found", params), Data: map[string]string{}})
+		return
 	}
 
 	data := singleActivityCache[uint(id)]
 	if data == nil {
-		return utils.Respond(c, 404, utils.Response{Status: "Not Found", Message: fmt.Sprintf("Activity with ID %d Not Found", id), Data: map[string]string{}})
+		utils.Respond(c, 404, utils.Response{Status: "Not Found", Message: fmt.Sprintf("Activity with ID %d Not Found", id), Data: map[string]string{}})
+		return
 	}
 	// if data != nil {
 	// 	response := utils.Response{Status: "Success", Message: "Success", Data: data}
@@ -73,18 +76,20 @@ var GetActivitiesById = func(c *fiber.Ctx) error {
 	// singleActivityCache[uint(id)] = query
 
 	response := utils.Response{Status: "Success", Message: "Success", Data: data}
-	return utils.Respond(c, 200, response)
+	utils.Respond(c, 200, response)
 }
 
-var CreateActivity = func(c *fiber.Ctx) error {
+var CreateActivity = func(c *fasthttp.RequestCtx) {
 	activity := &models.Activity{}
 
-	if err := c.BodyParser(activity); err != nil {
-		return utils.Respond(c, 400, utils.Response{Status: "Bad Request", Message: ""})
+	if err := json.Unmarshal(c.PostBody(), &activity); err != nil {
+		utils.Respond(c, 400, utils.Response{Status: "Bad Request", Message: ""})
+		return
 	}
 
 	if response, valid := activity.ValidateActivity(); !valid {
-		return utils.Respond(c, 400, response)
+		utils.Respond(c, 400, response)
+		return
 	}
 
 	now := time.Now()
@@ -101,14 +106,15 @@ var CreateActivity = func(c *fiber.Ctx) error {
 	activity.CreateActivity()
 
 	latestActivityId++
-	return utils.Respond(c, 201, utils.Message("Success", "Success", activity))
+	utils.Respond(c, 201, utils.Message("Success", "Success", activity))
 }
 
-var DeleteActivity = func(c *fiber.Ctx) error {
-	params := c.Params("id")
+var DeleteActivity = func(c *fasthttp.RequestCtx) {
+	params := fmt.Sprintf("%s", c.UserValue("id"))
 	id, err := strconv.Atoi(params)
 	if err != nil {
-		return utils.Respond(c, 404, utils.Response{Status: "Not Found", Message: fmt.Sprintf("Activity with ID %s Not Found", params), Data: map[string]string{}})
+		utils.Respond(c, 404, utils.Response{Status: "Not Found", Message: fmt.Sprintf("Activity with ID %s Not Found", params), Data: map[string]string{}})
+		return
 	}
 
 	activity := singleActivityCache[uint(id)]
@@ -117,7 +123,8 @@ var DeleteActivity = func(c *fiber.Ctx) error {
 	// }
 
 	if activity == nil {
-		return utils.Respond(c, 404, utils.Response{Status: "Not Found", Message: fmt.Sprintf("Activity with ID %d Not Found", id), Data: map[string]string{}})
+		utils.Respond(c, 404, utils.Response{Status: "Not Found", Message: fmt.Sprintf("Activity with ID %d Not Found", id), Data: map[string]string{}})
+		return
 	}
 
 	go activity.DeleteActivity()
@@ -126,23 +133,26 @@ var DeleteActivity = func(c *fiber.Ctx) error {
 		singleActivityCache[uint(id)] = nil
 	}()
 
-	return utils.Respond(c, 200, utils.Response{Status: "Success", Message: "Success", Data: map[string]string{}})
+	utils.Respond(c, 200, utils.Response{Status: "Success", Message: "Success", Data: map[string]string{}})
 }
 
-var EditActivity = func(c *fiber.Ctx) error {
-	params := c.Params("id")
+var EditActivity = func(c *fasthttp.RequestCtx) {
+	params := fmt.Sprintf("%s", c.UserValue("id"))
 	id, err := strconv.Atoi(params)
 	if err != nil {
-		return utils.Respond(c, 404, utils.Response{Status: "Not Found", Message: fmt.Sprintf("Activity with ID %s Not Found", params), Data: map[string]string{}})
+		utils.Respond(c, 404, utils.Response{Status: "Not Found", Message: fmt.Sprintf("Activity with ID %s Not Found", params), Data: map[string]string{}})
+		return
 	}
 
 	activity := &models.Activity{}
-	if err := c.BodyParser(activity); err != nil {
-		return utils.Respond(c, 400, utils.Response{Status: "Bad request", Message: err.Error()})
+	if err := json.Unmarshal(c.PostBody(), &activity); err != nil {
+		utils.Respond(c, 400, utils.Response{Status: "Bad request", Message: err.Error()})
+		return
 	}
 
 	if response, valid := activity.ValidateActivity(); !valid {
-		return utils.Respond(c, 400, response)
+		utils.Respond(c, 400, response)
+		return
 	}
 
 	existing := singleActivityCache[uint(id)]
@@ -151,7 +161,8 @@ var EditActivity = func(c *fiber.Ctx) error {
 	// }
 
 	if existing == nil {
-		return utils.Respond(c, 404, utils.Response{Status: "Not Found", Message: fmt.Sprintf("Activity with ID %d Not Found", id), Data: map[string]string{}})
+		utils.Respond(c, 404, utils.Response{Status: "Not Found", Message: fmt.Sprintf("Activity with ID %d Not Found", id), Data: map[string]string{}})
+		return
 	}
 
 	existing.Title = activity.Title
@@ -163,5 +174,5 @@ var EditActivity = func(c *fiber.Ctx) error {
 		singleActivityCache[uint(id)] = existing
 	}()
 
-	return utils.Respond(c, 200, utils.Message("Success", "Success", existing))
+	utils.Respond(c, 200, utils.Message("Success", "Success", existing))
 }
